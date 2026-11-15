@@ -1,0 +1,40 @@
+name: Extract ZIP and Cleanup
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '**.zip'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract-and-clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Delete old extracted folders
+        run: |
+          find . -maxdepth 1 -mindepth 1 -type d \
+            -not -name ".git" -not -name ".github" \
+            -exec rm -rf {} +
+
+      - name: Extract zip files (excluding .github) & delete zip
+        run: |
+          find . -maxdepth 1 -name "*.zip" | while read -r zipfile; do
+            echo "Extracting $zipfile -> ./ (excluding .github)"
+            unzip -o "$zipfile" -x ".github/*" -d .
+            rm -f "$zipfile"
+          done
+
+      - name: Commit & push changes (excluding .github)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A -- . ':!.github'
+          git diff --cached --quiet || git commit -m "Auto-extract zip and remove old folder"
+          git push
